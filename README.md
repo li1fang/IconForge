@@ -59,6 +59,14 @@
 
 > 使用 `uvicorn app.main:app --reload` 可在本地启动 API。健康检查：`/health`、`/api/v1/ping`。
 
+#### Monitoring & Safety (观测与防护)
+*   **Request ID 注入：** 后端为每个请求生成/透传 `X-Request-ID`，同时在日志中输出，用于端到端追踪。
+*   **Structured Logging：** 服务启动时开启 JSON 格式化日志，字段包含 `timestamp`、`level`、`message`、`request_id`，方便集中式收集。
+*   **Problem Details：** 全局异常处理器以统一的 RFC 7807 JSON 输出错误，字段：`type`、`title`、`status`、`detail`、`instance`、`request_id`。
+*   **可选防护开关：**
+    *   速率限制：`ICONFORGE_ENABLE_RATE_LIMIT=true` & `ICONFORGE_RATE_LIMIT_PER_MINUTE=120`（默认关闭）。
+    *   简易 API Key：`ICONFORGE_REQUIRE_API_KEY=<your-key>`（设置后所有 API 需要请求头 `X-API-Key`）。
+
 ### Frontend (The Workbench)
 *   **Framework:** **React 18** + Vite
 *   **UI Library:** Tailwind CSS (极简样式) + ShadcnUI
