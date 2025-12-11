@@ -64,8 +64,8 @@ async def get_material(
 async def get_preview(
     material_id: str,
     algo: ResampleAlgorithm,
-    size: int = 48,
     pipeline: Annotated[ImagePipeline, Depends(get_image_pipeline)],
+    size: int = 48,
 ) -> PreviewResponse:
     if size not in {32, 48}:
         raise HTTPException(

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import materials
+from app.api.v1.endpoints import forge, materials
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ async def ping() -> dict[str, str]:
 
 
 api_router.include_router(materials.router)
+api_router.include_router(forge.router)

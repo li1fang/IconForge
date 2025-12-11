@@ -5,17 +5,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from rembg import new_session
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 
 
 @asynccontextmanager
-def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):
     """Application lifespan hook for model preload and setup."""
 
     if settings.enable_background_removal:
+        from rembg import new_session
+
         os.environ.setdefault("U2NET_HOME", str(settings.model_cache_dir))
         settings.model_cache_dir.mkdir(parents=True, exist_ok=True)
         new_session("u2net")
