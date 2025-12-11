@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv
+.env.local
+.idea/
+.vscode/
+.DS_Store
+tmp/
+models/
