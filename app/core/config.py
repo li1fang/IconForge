@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     temp_dir: Path = Path("/tmp/iconforge/temp")
     model_cache_dir: Path = Path("/tmp/iconforge/models")
     max_upload_size_bytes: int = 10 * 1024 * 1024
+    enable_background_removal: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="ICONFORGE_", extra="ignore"
