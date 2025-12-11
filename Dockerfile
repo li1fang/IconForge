@@ -23,6 +23,7 @@ FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV U2NET_HOME=/tmp/iconforge/models
 
 WORKDIR /app
 
@@ -44,14 +45,17 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 COPY app ./app
 COPY pyproject.toml requirements.txt ./
 
-RUN useradd -m -u 1000 appuser
+RUN useradd -m -u 1000 appuser \
+    && mkdir -p "${U2NET_HOME}" /tmp/iconforge/temp \
+    && chown -R appuser:appuser "${U2NET_HOME}" /tmp/iconforge
+
 USER appuser
 
 RUN python - <<'PY'
 from pathlib import Path
 from rembg import new_session
 
-cache_dir = Path("/home/appuser/.u2net")
+cache_dir = Path("${U2NET_HOME}")
 cache_dir.mkdir(parents=True, exist_ok=True)
 new_session("u2net")
 PY
