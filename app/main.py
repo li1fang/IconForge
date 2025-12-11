@@ -15,9 +15,10 @@ from app.core.config import settings
 def lifespan(app: FastAPI):
     """Application lifespan hook for model preload and setup."""
 
-    os.environ.setdefault("U2NET_HOME", str(settings.model_cache_dir))
-    settings.model_cache_dir.mkdir(parents=True, exist_ok=True)
-    new_session("u2net")
+    if settings.enable_background_removal:
+        os.environ.setdefault("U2NET_HOME", str(settings.model_cache_dir))
+        settings.model_cache_dir.mkdir(parents=True, exist_ok=True)
+        new_session("u2net")
     yield
 
 

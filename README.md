@@ -52,6 +52,13 @@
     *   **Rembg:** 基于 U2-Net 的 AI 背景移除工具。
     *   **NumPy:** 高效像素矩阵运算。
 
+#### API Surface (Phase 1)
+* `POST /api/v1/materials/upload` — `multipart/form-data` 上传原图，自动完成去底与智能裁剪，返回 256px PNG 的 Base64 预览及裁剪元数据。
+* `GET /api/v1/materials/{id}` — 获取对应素材的 256px 处理结果和裁剪信息。
+* `GET /api/v1/materials/{id}/preview?algo=LANCZOS&size=48` — 按算法 (`LANCZOS`/`NEAREST`/`BILINEAR`) 生成 48px 或 32px 预览，带内存缓存避免重复计算。
+
+> 使用 `uvicorn app.main:app --reload` 可在本地启动 API。健康检查：`/health`、`/api/v1/ping`。
+
 ### Frontend (The Workbench)
 *   **Framework:** **React 18** + Vite
 *   **UI Library:** Tailwind CSS (极简样式) + ShadcnUI
