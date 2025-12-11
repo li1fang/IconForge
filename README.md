@@ -59,6 +59,11 @@
 
 > 使用 `uvicorn app.main:app --reload` 可在本地启动 API。健康检查：`/health`、`/api/v1/ping`。
 
+#### Upload Constraints & Cleanup (上传限制与清理策略)
+*   **Allowed formats (格式限制)：** 仅支持 PNG / JPG(JPEG) / WEBP，上传时会检查扩展名与实际 MIME/格式是否一致，避免伪装文件。
+*   **Max size (大小限制)：** 默认 `10MB`，可通过 `ICONFORGE_MAX_UPLOAD_SIZE_BYTES` 调整。
+*   **Temp retention (临时文件保留)：** 上传素材会落盘到 `ICONFORGE_TEMP_DIR`（默认 `/tmp/iconforge/temp`）。若距离最近一次访问超过 `ICONFORGE_MATERIAL_TTL_SECONDS`（默认 `3600s`），将在后续上传或读取时自动逐出并清理目录与缓存。
+
 #### Monitoring & Safety (观测与防护)
 *   **Request ID 注入：** 后端为每个请求生成/透传 `X-Request-ID`，同时在日志中输出，用于端到端追踪。
 *   **Structured Logging：** 服务启动时开启 JSON 格式化日志，字段包含 `timestamp`、`level`、`message`、`request_id`，方便集中式收集。

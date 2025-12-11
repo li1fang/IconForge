@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     temp_dir: Path = Path("/tmp/iconforge/temp")
     model_cache_dir: Path = Path("/tmp/iconforge/models")
     max_upload_size_bytes: int = 10 * 1024 * 1024
+    allowed_image_extensions: tuple[str, ...] = (".png", ".jpg", ".jpeg", ".webp")
+    allowed_image_formats: tuple[str, ...] = ("PNG", "JPEG", "WEBP")
+    material_ttl_seconds: int = 60 * 60
     enable_background_removal: bool = True
     request_id_header: str = "X-Request-ID"
     enable_rate_limit: bool = False

@@ -3,7 +3,13 @@ import io
 import pytest
 from PIL import Image
 
-from app.services.image_processing import ImagePipeline, ResampleAlgorithm, resize_image, smart_crop
+from app.services.image_processing import (
+    ImagePipeline,
+    MaterialNotFoundError,
+    ResampleAlgorithm,
+    resize_image,
+    smart_crop,
+)
 
 
 def create_alpha_image(width: int, height: int, box: tuple[int, int, int, int]) -> Image.Image:
@@ -65,3 +71,49 @@ async def test_pipeline_process_upload_without_background_removal(tmp_path, monk
     second_preview = await pipeline.get_preview_bytes(record.material_id, ResampleAlgorithm.NEAREST, 32)
 
     assert first_preview == second_preview  # cached response
+
+
+@pytest.mark.asyncio
+async def test_pipeline_rejects_non_image(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
+    pipeline = ImagePipeline(background_removal_enabled=False)
+
+    with pytest.raises(ValueError, match="valid image"):
+        await pipeline.process_upload(b"not an image", "fake.png")
+
+
+@pytest.mark.asyncio
+async def test_pipeline_rejects_oversized_upload(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
+    monkeypatch.setattr("app.services.image_processing.settings.max_upload_size_bytes", 10)
+    pipeline = ImagePipeline(background_removal_enabled=False)
+
+    small_image = Image.new("RGBA", (1, 1), (255, 255, 255, 255))
+    buffer = io.BytesIO()
+    small_image.save(buffer, format="PNG")
+
+    with pytest.raises(ValueError, match="exceeds maximum size"):
+        await pipeline.process_upload(buffer.getvalue(), "tiny.png")
+
+
+@pytest.mark.asyncio
+async def test_expired_materials_are_evicted(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
+    monkeypatch.setattr("app.services.image_processing.settings.material_ttl_seconds", 1)
+    pipeline = ImagePipeline(background_removal_enabled=False)
+
+    original_time = lambda: 1000.0
+    monkeypatch.setattr("app.services.image_processing.time.time", original_time)
+
+    image = create_alpha_image(32, 32, (5, 5, 15, 15))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    record = await pipeline.process_upload(buffer.getvalue(), "old.png")
+
+    monkeypatch.setattr("app.services.image_processing.time.time", lambda: 1002.0)
+
+    with pytest.raises(MaterialNotFoundError):
+        await pipeline.get_material(record.material_id)
+
+    assert not (tmp_path / record.material_id).exists()
