@@ -4,6 +4,8 @@ import asyncio
 import base64
 import io
 import math
+import shutil
+import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -11,7 +13,7 @@ from typing import Dict, Tuple
 from uuid import uuid4
 
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from app.core.config import settings
 
@@ -40,6 +42,8 @@ class MaterialRecord:
     height: int
     crop_box: Tuple[int, int, int, int]
     padding: int
+    created_at: float
+    last_access: float
 
 
 class MaterialNotFoundError(KeyError):
@@ -56,6 +60,8 @@ class ImagePipeline:
 
     async def process_upload(self, content: bytes, filename: str) -> MaterialRecord:
         self._validate_size(content)
+        self._validate_image_type(content, filename)
+        self._evict_expired()
         image = await asyncio.to_thread(self._load_image, content)
         if self.background_removal_enabled:
             image = await asyncio.to_thread(self._remove_background, image)
@@ -80,15 +86,20 @@ class ImagePipeline:
             height=processed.height,
             crop_box=crop_box,
             padding=padding,
+            created_at=time.time(),
+            last_access=time.time(),
         )
         self.materials[material_id] = record
         return record
 
     async def get_material(self, material_id: str) -> MaterialRecord:
+        self._evict_expired()
         try:
-            return self.materials[material_id]
+            record = self.materials[material_id]
         except KeyError as exc:  # pragma: no cover - defensive
             raise MaterialNotFoundError(material_id) from exc
+        record.last_access = time.time()
+        return record
 
     async def get_material_bytes(self, material_id: str) -> bytes:
         record = await self.get_material(material_id)
@@ -115,6 +126,35 @@ class ImagePipeline:
         if len(content) > settings.max_upload_size_bytes:
             raise ValueError("Uploaded file exceeds maximum size limit")
 
+    def _validate_image_type(self, content: bytes, filename: str) -> None:
+        extension = Path(filename).suffix.lower()
+        if extension not in settings.allowed_image_extensions:
+            allowed = ", ".join(settings.allowed_image_extensions)
+            raise ValueError(f"Unsupported file extension. Allowed: {allowed}")
+
+        try:
+            with Image.open(io.BytesIO(content)) as image:
+                image.verify()
+                detected_format = image.format
+        except UnidentifiedImageError as exc:
+            raise ValueError("Uploaded file is not a valid image") from exc
+
+        if detected_format not in settings.allowed_image_formats:
+            allowed = ", ".join(settings.allowed_image_formats)
+            raise ValueError(f"Unsupported image format. Allowed: {allowed}")
+
+        expected_format = {
+            ".png": "PNG",
+            ".jpg": "JPEG",
+            ".jpeg": "JPEG",
+            ".webp": "WEBP",
+        }.get(extension)
+
+        if expected_format and detected_format != expected_format:
+            raise ValueError(
+                "File extension does not match detected image format"
+            )
+
     def _load_image(self, content: bytes) -> Image.Image:
         image = Image.open(io.BytesIO(content))
         return image.convert("RGBA")
@@ -134,6 +174,28 @@ class ImagePipeline:
 
     def _read_bytes(self, path: Path) -> bytes:
         return path.read_bytes()
+
+    def _evict_expired(self) -> None:
+        now = time.time()
+        expired = [
+            material_id
+            for material_id, record in self.materials.items()
+            if now - record.last_access > settings.material_ttl_seconds
+        ]
+        for material_id in expired:
+            self._delete_material(material_id)
+
+    def _delete_material(self, material_id: str) -> None:
+        record = self.materials.pop(material_id, None)
+        if not record:
+            return
+
+        self.preview_cache = {
+            key: value for key, value in self.preview_cache.items() if key[0] != material_id
+        }
+
+        material_dir = record.original_path.parent
+        shutil.rmtree(material_dir, ignore_errors=True)
 
 
 def smart_crop(image: Image.Image) -> tuple[Image.Image, tuple[int, int, int, int], int]:
