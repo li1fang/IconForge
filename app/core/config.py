@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     model_cache_dir: Path = Path("/tmp/iconforge/models")
     max_upload_size_bytes: int = 10 * 1024 * 1024
     enable_background_removal: bool = True
+    request_id_header: str = "X-Request-ID"
+    enable_rate_limit: bool = False
+    rate_limit_per_minute: int = 120
+    require_api_key: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="ICONFORGE_", extra="ignore"
