@@ -52,4 +52,4 @@ jobs:
 
       - name: Test frontend
         working-directory: frontend
-        run: npm run test -- --runInBand
+        run: npm run test:ci

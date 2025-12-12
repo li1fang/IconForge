@@ -56,8 +56,8 @@ describe("PixelBoard interactions", () => {
 
     await userEvent.pointer([
       { target: canvas, coords: { x: 10, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]", type: "pointermove" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", type: "pointerup" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse" },
     ]);
 
     await waitFor(() =>
@@ -87,8 +87,8 @@ describe("PixelBoard interactions", () => {
 
     await userEvent.pointer([
       { target: canvas, coords: { x: 10, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]", type: "pointermove" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", type: "pointerup" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse" },
     ]);
 
     await waitFor(() =>
