@@ -86,14 +86,18 @@ export async function forgeIcon(
   midAlgo: string,
   tinyIcon: Blob
 ): Promise<Blob> {
+  const url = new URL(`${API_BASE_URL}/forge`, window.location.origin);
+  url.searchParams.set("mid_algo", midAlgo);
+
   const form = new FormData();
   form.append("source_id", sourceId);
   form.append("mid_algo", midAlgo);
   form.append("tiny_icon", new File([tinyIcon], "tiny-icon.png", { type: "image/png" }));
 
-  const response = await fetch(`${API_BASE_URL}/forge`, {
+  const response = await fetch(url.toString(), {
     method: "POST",
     body: form,
+    headers: { "x-mid-algo": midAlgo },
   });
 
   if (!response.ok) {

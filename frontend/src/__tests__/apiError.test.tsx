@@ -4,17 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EditorPage } from "@/pages/EditorPage";
 
-const originalFetch = global.fetch;
+const originalFetch = globalThis.fetch;
 
 describe("API error handling", () => {
   afterEach(() => {
-    global.fetch = originalFetch;
+    globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
   it("shows error message when request fails", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("Network crash"));
-    global.fetch = fetchMock as unknown as typeof fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     render(<EditorPage />);
 
@@ -26,13 +26,6 @@ describe("API error handling", () => {
   it("uses backend field names for preview flow", async () => {
     const materialResponse = new Response(
       JSON.stringify({ material_id: "abc", image_base64: "data-material" }),
-      {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }
-    );
-    const previewResponse = new Response(
-      JSON.stringify({ image_base64: "preview-data" }),
       {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -50,7 +43,7 @@ describe("API error handling", () => {
           })
         )
       );
-    global.fetch = fetchMock as unknown as typeof fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     render(<EditorPage />);
 

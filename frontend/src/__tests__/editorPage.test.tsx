@@ -4,9 +4,12 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+const { mockExportPngBlob } = vi.hoisted(() => ({
+  mockExportPngBlob: vi.fn(async () => new Blob(["tiny"], { type: "image/png" })),
+}));
+
 vi.mock("@/components/PixelBoard", async () => {
   const React = await import("react");
-  const mockExportPngBlob = vi.fn(async () => new Blob(["tiny"], { type: "image/png" }));
   const PixelBoard = React.forwardRef((_, ref) => {
     React.useImperativeHandle(ref, () => ({
       exportPngBlob: mockExportPngBlob,
@@ -23,7 +26,6 @@ vi.mock("@/components/PixelBoard", async () => {
 });
 
 import { EditorPage } from "@/pages/EditorPage";
-import { mockExportPngBlob } from "@/components/PixelBoard";
 
 const API_BASE = "/api/v1";
 const base64Image = "YmFzZTY0LWRhdGE=";
@@ -46,8 +48,12 @@ const server = setupServer(
   }),
   http.post(`${API_BASE}/forge`, async ({ request }) => {
     forgeCalled = true;
-    const formData = await request.formData();
-    lastForgeAlgo = (formData.get("mid_algo") as string) ?? "";
+    const urlAlgo = new URL(request.url).searchParams.get("mid_algo");
+    lastForgeAlgo =
+      request.headers.get("x-mid-algo") ??
+      urlAlgo ??
+      "";
+    await request.formData();
     return HttpResponse.text("ico-binary");
   })
 );
@@ -136,12 +142,6 @@ describe("EditorPage API flows", () => {
     URL.createObjectURL = createObjectUrlSpy;
     URL.revokeObjectURL = revokeSpy;
 
-    const requestUrls: string[] = [];
-    const requestListener = ({ request }: { request: Request }) => {
-      requestUrls.push(request.url);
-    };
-    server.events.on("request:start", requestListener);
-
     render(<EditorPage />);
 
     await userEvent.selectOptions(screen.getByLabelText("算法选择"), "BILINEAR");
@@ -152,10 +152,9 @@ describe("EditorPage API flows", () => {
 
     await waitFor(() => expect(mockExportPngBlob).toHaveBeenCalled(), { timeout: 2000 });
     await waitFor(() => expect(forgeCalled).toBe(true), { timeout: 2000 });
-    expect(requestUrls.some((url) => url.endsWith("/api/v1/forge"))).toBe(true);
+    await waitFor(() => expect(lastForgeAlgo).toBe("BILINEAR"));
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
-    server.events.removeListener("request:start", requestListener);
   });
 
   it("shows forge error with api details", async () => {

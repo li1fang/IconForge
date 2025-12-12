@@ -2,7 +2,8 @@ import { render, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PixelBoard, pixelsToPngBlob } from "@/components/PixelBoard";
+import { PixelBoard } from "@/components/PixelBoard";
+import { pixelsToPngBlob } from "@/lib/pixel-export";
 
 describe("PixelBoard interactions", () => {
   const originalToBlob = HTMLCanvasElement.prototype.toBlob;
@@ -56,8 +57,8 @@ describe("PixelBoard interactions", () => {
 
     await userEvent.pointer([
       { target: canvas, coords: { x: 10, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]", type: "pointermove" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", type: "pointerup" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse" },
     ]);
 
     await waitFor(() =>
@@ -87,8 +88,8 @@ describe("PixelBoard interactions", () => {
 
     await userEvent.pointer([
       { target: canvas, coords: { x: 10, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]", type: "pointermove" },
-      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", type: "pointerup" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse", keys: "[MouseLeft]" },
+      { target: canvas, coords: { x: 20, y: 10 }, pointerName: "mouse" },
     ]);
 
     await waitFor(() =>
