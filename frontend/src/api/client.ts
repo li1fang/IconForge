@@ -58,18 +58,71 @@ export async function fetchMaterial(id: string): Promise<MaterialResponse> {
 export interface PreviewParams {
   algo?: string;
   size?: number;
+  targetSize?: number;
+  fallbackSizes?: number[];
+}
+
+async function scalePreviewToSize(imageBase64: string, targetSize: number) {
+  const image = new Image();
+  image.src = `data:image/png;base64,${imageBase64}`;
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Failed to load preview image"));
+  });
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas is not supported in this environment");
+  }
+
+  canvas.width = targetSize;
+  canvas.height = targetSize;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(image, 0, 0, targetSize, targetSize);
+
+  return canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, "");
 }
 
 export async function fetchPreview(id: string, params: PreviewParams = {}): Promise<PreviewResponse> {
-  const url = new URL(`${API_BASE_URL}/materials/${id}/preview`, window.location.origin);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined) {
-      url.searchParams.set(key, String(value));
-    }
-  });
+  const { targetSize, fallbackSizes = [], ...query } = params;
+  const preferredSize = query.size ?? targetSize;
+  const candidates = preferredSize !== undefined ? [preferredSize, ...fallbackSizes] : fallbackSizes;
 
-  const response = await fetch(url.toString());
-  return handleResponse<PreviewResponse>(response);
+  if (!candidates.length) {
+    throw new Error("Preview size is required when no fallback sizes are provided");
+  }
+
+  let lastError: unknown;
+  for (const requestedSize of candidates) {
+    const url = new URL(`${API_BASE_URL}/materials/${id}/preview`, window.location.origin);
+    const searchParams = { ...query, size: requestedSize } satisfies PreviewParams;
+
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value !== undefined) {
+        url.searchParams.set(key, String(value));
+      }
+    });
+
+    try {
+      const response = await fetch(url.toString());
+      const preview = await handleResponse<PreviewResponse>(response);
+
+      if (targetSize && targetSize !== requestedSize) {
+        const scaled = await scalePreviewToSize(preview.image_base64, targetSize);
+        return { image_base64: scaled };
+      }
+      return preview;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+  throw new Error("Failed to fetch preview");
 }
 
 async function parseErrorResponse(response: Response) {

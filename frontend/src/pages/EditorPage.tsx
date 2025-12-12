@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { AlertTriangle, Images, Upload } from "lucide-react";
 
 import { PixelBoard, type PixelBoardHandle } from "@/components/PixelBoard";
@@ -22,8 +22,17 @@ export function EditorPage() {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [forging, setForging] = useState(false);
+  const [referencePreview, setReferencePreview] = useState<string | null>(() =>
+    previews[16] ? `data:image/png;base64,${previews[16]}` : null
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pixelBoardRef = useRef<PixelBoardHandle | null>(null);
+
+  useEffect(() => {
+    if (previews[16]) {
+      setReferencePreview(`data:image/png;base64,${previews[16]}`);
+    }
+  }, [previews]);
 
   const handleUpload = useCallback(
     async (file?: File | null) => {
@@ -32,6 +41,7 @@ export function EditorPage() {
       setError(null);
       setMessage(null);
       setPreviews({});
+      setReferencePreview(null);
       try {
         const material = await uploadMaterial(file);
         setMaterialId(material.material_id);
@@ -60,6 +70,14 @@ export function EditorPage() {
           return [size, preview.image_base64] as const;
         })
       );
+      const tinyPreview = await fetchPreview(material.material_id, {
+        algo,
+        size: 16,
+        targetSize: 16,
+        fallbackSizes: [32, 48],
+      });
+      previewEntries.push([16, tinyPreview.image_base64]);
+      setReferencePreview(`data:image/png;base64,${tinyPreview.image_base64}`);
       setPreviews(Object.fromEntries(previewEntries));
       setMessage(`已获取素材 ${material.material_id}，算法 ${algo}`);
     } catch (err) {
@@ -258,7 +276,7 @@ export function EditorPage() {
         </div>
       </section>
 
-      <PixelBoard ref={pixelBoardRef} />
+      <PixelBoard ref={pixelBoardRef} referenceDataUrl={referencePreview} />
     </div>
   );
 }

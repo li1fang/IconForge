@@ -49,7 +49,7 @@ describe("API error handling", () => {
 
     await userEvent.click(screen.getByText("请求预览"));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
     expect(await screen.findByTestId("api-success"))
       .toHaveTextContent("已获取素材 abc，算法 LANCZOS");
 
