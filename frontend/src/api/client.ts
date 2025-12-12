@@ -16,7 +16,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-export async function uploadMaterial(file: File) {
+export interface MaterialResponse {
+  material_id: string;
+  image_base64: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface PreviewResponse {
+  image_base64: string;
+}
+
+export async function uploadMaterial(file: File): Promise<MaterialResponse> {
   const form = new FormData();
   form.append("file", file);
 
@@ -24,14 +34,12 @@ export async function uploadMaterial(file: File) {
     method: "POST",
     body: form,
   });
-  return handleResponse<{ id: string; preview: string }>(response);
+  return handleResponse<MaterialResponse>(response);
 }
 
-export async function fetchMaterial(id: string) {
+export async function fetchMaterial(id: string): Promise<MaterialResponse> {
   const response = await fetch(`${API_BASE_URL}/materials/${id}`);
-  return handleResponse<{ id: string; preview: string; meta?: Record<string, unknown> }>(
-    response
-  );
+  return handleResponse<MaterialResponse>(response);
 }
 
 export interface PreviewParams {
@@ -39,7 +47,7 @@ export interface PreviewParams {
   size?: number;
 }
 
-export async function fetchPreview(id: string, params: PreviewParams = {}) {
+export async function fetchPreview(id: string, params: PreviewParams = {}): Promise<PreviewResponse> {
   const url = new URL(`${API_BASE_URL}/materials/${id}/preview`, window.location.origin);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
@@ -48,5 +56,5 @@ export async function fetchPreview(id: string, params: PreviewParams = {}) {
   });
 
   const response = await fetch(url.toString());
-  return handleResponse<{ preview: string }>(response);
+  return handleResponse<PreviewResponse>(response);
 }

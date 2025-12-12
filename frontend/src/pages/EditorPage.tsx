@@ -17,8 +17,8 @@ export function EditorPage() {
     setMessage(null);
     try {
       const material = await fetchMaterial(materialId);
-      const preview = await fetchPreview(material.id, { size: 32, algo: "LANCZOS" });
-      setMessage(`已获取素材 ${material.id}, 预览长度 ${preview.preview.length}`);
+      const preview = await fetchPreview(material.material_id, { size: 32, algo: "LANCZOS" });
+      setMessage(`已获取素材 ${material.material_id}, 预览长度 ${preview.image_base64.length}`);
     } catch (err) {
       const reason = err instanceof Error ? err.message : "未知错误";
       setError(reason);
