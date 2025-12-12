@@ -1,16 +1,10 @@
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Eraser, Paintbrush2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { pixelsToPngBlob } from "@/lib/pixel-export";
+import { useEditorStore } from "@/lib/use-editor-store";
 
 const BOARD_SIZE = 16;
 const DISPLAY_SCALE = 16;
@@ -69,9 +63,8 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
   { onPixelsChange }: PixelBoardProps,
   ref
 ) {
-  const [pixels, setPixels] = useState<string[]>(
-    () => Array(BOARD_SIZE * BOARD_SIZE).fill("")
-  );
+  const pixelData = useEditorStore((state) => state.pixelData);
+  const setPixelData = useEditorStore((state) => state.setPixelData);
   const [tool, setTool] = useState<"brush" | "eraser">("brush");
   const [brushColor, setBrushColor] = useState("#ff4d4f");
   const [activePixel, setActivePixel] = useState<string>("blank");
@@ -95,21 +88,21 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
   );
 
   useEffect(() => {
-    renderAll(pixels);
-    onPixelsChange?.(pixels);
-  }, [pixels, onPixelsChange, renderAll]);
+    renderAll(pixelData);
+    onPixelsChange?.(pixelData);
+  }, [pixelData, onPixelsChange, renderAll]);
 
   useEffect(() => {
-    setColoredCount(pixels.filter(Boolean).length);
-  }, [pixels]);
+    setColoredCount(pixelData.filter(Boolean).length);
+  }, [pixelData]);
 
   useImperativeHandle(
     ref,
     () => ({
-      exportPngBlob: () => pixelsToPngBlob(pixels),
-      getPixels: () => [...pixels],
+      exportPngBlob: () => pixelsToPngBlob(pixelData),
+      getPixels: () => [...pixelData],
     }),
-    [pixels]
+    [pixelData]
   );
 
   const updatePixel = (clientX: number, clientY: number, canvas: HTMLCanvasElement) => {
@@ -120,7 +113,7 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
     const y = Math.floor((clientY - rect.top) / scaleY);
     if (x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) return;
 
-    setPixels((prev) => {
+    setPixelData((prev) => {
       const next = [...prev];
       const idx = y * BOARD_SIZE + x;
       next[idx] = tool === "brush" ? brushColor : "";
@@ -212,7 +205,7 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
             variant="outline"
             size="sm"
             onClick={() =>
-              setPixels(() => {
+              setPixelData(() => {
                 const empty = Array(BOARD_SIZE * BOARD_SIZE).fill("");
                 setColoredCount(0);
                 return empty;
