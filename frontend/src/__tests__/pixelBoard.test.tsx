@@ -2,7 +2,8 @@ import { render, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PixelBoard, pixelsToPngBlob } from "@/components/PixelBoard";
+import { PixelBoard } from "@/components/PixelBoard";
+import { pixelsToPngBlob } from "@/lib/pixel-export";
 
 describe("PixelBoard interactions", () => {
   const originalToBlob = HTMLCanvasElement.prototype.toBlob;

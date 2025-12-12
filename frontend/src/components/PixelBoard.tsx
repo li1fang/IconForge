@@ -10,6 +10,7 @@ import { Eraser, Paintbrush2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { pixelsToPngBlob } from "@/lib/pixel-export";
 
 const BOARD_SIZE = 16;
 const DISPLAY_SCALE = 16;
@@ -64,37 +65,6 @@ export interface PixelBoardHandle {
   getPixels: () => string[];
 }
 
-export async function pixelsToPngBlob(
-  pixels: string[],
-  size: number = BOARD_SIZE
-): Promise<Blob> {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("无法创建画布上下文，导出 PNG 失败");
-  }
-
-  pixels.forEach((color, index) => {
-    if (!color) return;
-    const x = index % size;
-    const y = Math.floor(index / size);
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, 1, 1);
-  });
-
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("无法生成 PNG Blob"));
-        return;
-      }
-      resolve(blob);
-    }, "image/png");
-  });
-}
-
 export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function PixelBoard(
   { onPixelsChange }: PixelBoardProps,
   ref
@@ -114,21 +84,20 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
 
   const referencePixels = useMemo(createReferencePixels, []);
 
-  const renderAll = (nextPixels: string[]) => {
-    drawPixels(boardCanvasRef.current, nextPixels, DISPLAY_SCALE);
-    drawPixels(previewCanvasRef.current, nextPixels, PREVIEW_SCALE);
-    drawPixels(referenceCanvasRef.current, referencePixels, PREVIEW_SCALE);
-  };
-
-  useEffect(() => {
-    renderAll(pixels);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const renderAll = useMemo(
+    () =>
+      (nextPixels: string[]) => {
+        drawPixels(boardCanvasRef.current, nextPixels, DISPLAY_SCALE);
+        drawPixels(previewCanvasRef.current, nextPixels, PREVIEW_SCALE);
+        drawPixels(referenceCanvasRef.current, referencePixels, PREVIEW_SCALE);
+      },
+    [referencePixels]
+  );
 
   useEffect(() => {
     renderAll(pixels);
     onPixelsChange?.(pixels);
-  }, [pixels, onPixelsChange]);
+  }, [pixels, onPixelsChange, renderAll]);
 
   useEffect(() => {
     setColoredCount(pixels.filter(Boolean).length);
