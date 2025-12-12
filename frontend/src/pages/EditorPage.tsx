@@ -12,14 +12,13 @@ import {
   forgeIcon,
   uploadMaterial,
 } from "@/api/client";
+import { useEditorStore } from "@/lib/use-editor-store";
 
 export function EditorPage() {
-  const [materialId, setMaterialId] = useState("demo-id");
+  const { materialId, setMaterialId, algo, setAlgo, previews, setPreviews } = useEditorStore();
   const [materialImage, setMaterialImage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [algo, setAlgo] = useState("LANCZOS");
-  const [previews, setPreviews] = useState<Record<number, string>>({});
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [forging, setForging] = useState(false);
@@ -45,7 +44,7 @@ export function EditorPage() {
         setUploading(false);
       }
     },
-    [setMaterialId]
+    [setMaterialId, setPreviews]
   );
 
   const handlePreview = useCallback(async () => {
@@ -67,7 +66,7 @@ export function EditorPage() {
       const reason = err instanceof Error ? err.message : "未知错误";
       setError(reason);
     }
-  }, [algo, materialId]);
+  }, [algo, materialId, setPreviews]);
 
   const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
