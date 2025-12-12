@@ -1,11 +1,17 @@
 import { useCallback, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { AlertTriangle, Images, Upload } from "lucide-react";
 
-import { PixelBoard } from "@/components/PixelBoard";
+import { PixelBoard, type PixelBoardHandle } from "@/components/PixelBoard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { fetchMaterial, fetchPreview, uploadMaterial } from "@/api/client";
+import {
+  ApiError,
+  fetchMaterial,
+  fetchPreview,
+  forgeIcon,
+  uploadMaterial,
+} from "@/api/client";
 
 export function EditorPage() {
   const [materialId, setMaterialId] = useState("demo-id");
@@ -16,7 +22,9 @@ export function EditorPage() {
   const [previews, setPreviews] = useState<Record<number, string>>({});
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [forging, setForging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pixelBoardRef = useRef<PixelBoardHandle | null>(null);
 
   const handleUpload = useCallback(
     async (file?: File | null) => {
@@ -81,6 +89,43 @@ export function EditorPage() {
   const onDragLeave = () => {
     setDragActive(false);
   };
+
+  const handleForge = useCallback(async () => {
+    const trimmedId = materialId.trim();
+    if (!trimmedId) {
+      setError("请输入有效的素材 ID");
+      return;
+    }
+
+    setError(null);
+    setMessage(null);
+    const board = pixelBoardRef.current;
+    if (!board) {
+      setError("画板尚未加载完成，请稍后重试。");
+      return;
+    }
+
+    setForging(true);
+    try {
+      const tinyIcon = await board.exportPngBlob();
+      const icoBlob = await forgeIcon(trimmedId, algo, tinyIcon);
+      const link = document.createElement("a");
+      const blobUrl = URL.createObjectURL(icoBlob);
+      link.href = blobUrl;
+      link.download = `${trimmedId}.ico`;
+      link.click();
+      URL.revokeObjectURL(blobUrl);
+      setMessage("Forge 成功，已开始下载 ICO 文件。");
+    } catch (err) {
+      let reason = err instanceof Error ? err.message : "未知错误";
+      if (err instanceof ApiError && (err.status === 404 || err.status === 400)) {
+        reason = `${reason}，素材可能已过期，请重新上传或刷新后重试。`;
+      }
+      setError(reason);
+    } finally {
+      setForging(false);
+    }
+  }, [algo, materialId]);
 
   return (
     <div className="space-y-6">
@@ -149,6 +194,9 @@ export function EditorPage() {
                 <option value="NEAREST">NEAREST（像素风）</option>
               </select>
             </div>
+            <Button onClick={handleForge} disabled={forging} className="w-full">
+              {forging ? "Forge 中..." : "Forge"}
+            </Button>
             {message && (
               <div className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary" data-testid="api-success">
                 {message}
@@ -211,7 +259,7 @@ export function EditorPage() {
         </div>
       </section>
 
-      <PixelBoard />
+      <PixelBoard ref={pixelBoardRef} />
     </div>
   );
 }

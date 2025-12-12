@@ -1,6 +1,16 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.toString().replace(/\/$/, "") || "/api/v1";
 
+export class ApiError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type");
   const payload = contentType?.includes("application/json")
@@ -10,7 +20,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const detail =
       typeof payload === "string" ? payload : payload?.detail || payload?.title;
-    throw new Error(detail || `Request failed with status ${response.status}`);
+    throw new ApiError(
+      detail || `Request failed with status ${response.status}`,
+      response.status
+    );
   }
 
   return payload as T;
@@ -57,4 +70,36 @@ export async function fetchPreview(id: string, params: PreviewParams = {}): Prom
 
   const response = await fetch(url.toString());
   return handleResponse<PreviewResponse>(response);
+}
+
+async function parseErrorResponse(response: Response) {
+  const contentType = response.headers.get("content-type");
+  if (contentType?.includes("application/json")) {
+    const payload = await response.json();
+    return payload?.detail || payload?.title;
+  }
+  return response.text();
+}
+
+export async function forgeIcon(
+  sourceId: string,
+  midAlgo: string,
+  tinyIcon: Blob
+): Promise<Blob> {
+  const form = new FormData();
+  form.append("source_id", sourceId);
+  form.append("mid_algo", midAlgo);
+  form.append("tiny_icon", new File([tinyIcon], "tiny-icon.png", { type: "image/png" }));
+
+  const response = await fetch(`${API_BASE_URL}/forge`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!response.ok) {
+    const detail = await parseErrorResponse(response);
+    throw new ApiError(detail || `Request failed with status ${response.status}`, response.status);
+  }
+
+  return response.blob();
 }
