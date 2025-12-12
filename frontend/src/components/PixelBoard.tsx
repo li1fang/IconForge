@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Eraser, Paintbrush2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -50,8 +50,52 @@ function createReferencePixels() {
   return pixels;
 }
 
+function toHex(value: number) {
+  return value.toString(16).padStart(2, "0");
+}
+
+async function extractReferencePixels(dataUrl?: string | null) {
+  if (!dataUrl) return createReferencePixels();
+
+  const image = new Image();
+  image.src = dataUrl;
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Failed to load reference image"));
+  });
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return createReferencePixels();
+
+  canvas.width = BOARD_SIZE;
+  canvas.height = BOARD_SIZE;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(image, 0, 0, BOARD_SIZE, BOARD_SIZE);
+
+  const imageData = ctx.getImageData(0, 0, BOARD_SIZE, BOARD_SIZE).data;
+  const pixels: string[] = Array(BOARD_SIZE * BOARD_SIZE).fill("");
+
+  for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+    const baseIndex = i * 4;
+    const alpha = imageData[baseIndex + 3];
+    if (alpha === 0) {
+      pixels[i] = "";
+      continue;
+    }
+    const r = imageData[baseIndex];
+    const g = imageData[baseIndex + 1];
+    const b = imageData[baseIndex + 2];
+    pixels[i] = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  return pixels;
+}
+
 interface PixelBoardProps {
   onPixelsChange?: (pixels: string[]) => void;
+  referenceDataUrl?: string | null;
 }
 
 export interface PixelBoardHandle {
@@ -60,7 +104,7 @@ export interface PixelBoardHandle {
 }
 
 export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function PixelBoard(
-  { onPixelsChange }: PixelBoardProps,
+  { onPixelsChange, referenceDataUrl }: PixelBoardProps,
   ref
 ) {
   const pixelData = useEditorStore((state) => state.pixelData);
@@ -75,22 +119,41 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const referenceCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const referencePixels = useMemo(createReferencePixels, []);
-
-  const renderAll = useMemo(
-    () =>
-      (nextPixels: string[]) => {
-        drawPixels(boardCanvasRef.current, nextPixels, DISPLAY_SCALE);
-        drawPixels(previewCanvasRef.current, nextPixels, PREVIEW_SCALE);
-        drawPixels(referenceCanvasRef.current, referencePixels, PREVIEW_SCALE);
-      },
-    [referencePixels]
-  );
+  const [referencePixels, setReferencePixels] = useState<string[]>(() => createReferencePixels());
 
   useEffect(() => {
-    renderAll(pixelData);
+    let active = true;
+    void extractReferencePixels(referenceDataUrl)
+      .then((pixels) => {
+        if (active) setReferencePixels(pixels);
+      })
+      .catch((error) => {
+        console.warn("Failed to update reference preview", error);
+        if (active) setReferencePixels(createReferencePixels());
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [referenceDataUrl]);
+
+  const renderBoard = useCallback((nextPixels: string[]) => {
+    drawPixels(boardCanvasRef.current, nextPixels, DISPLAY_SCALE);
+    drawPixels(previewCanvasRef.current, nextPixels, PREVIEW_SCALE);
+  }, []);
+
+  const renderReference = useCallback(() => {
+    drawPixels(referenceCanvasRef.current, referencePixels, PREVIEW_SCALE);
+  }, [referencePixels]);
+
+  useEffect(() => {
+    renderBoard(pixelData);
     onPixelsChange?.(pixelData);
-  }, [pixelData, onPixelsChange, renderAll]);
+  }, [pixelData, onPixelsChange, renderBoard]);
+
+  useEffect(() => {
+    renderReference();
+  }, [renderReference]);
 
   useEffect(() => {
     setColoredCount(pixelData.filter(Boolean).length);
@@ -150,6 +213,10 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
     const y = Math.floor((event.clientY - rect.top) / scaleY);
     const idx = y * BOARD_SIZE + x;
     const picked = referencePixels[idx];
+    if (!picked) {
+      setTool("eraser");
+      return;
+    }
     setBrushColor(picked);
     setTool("brush");
   };
