@@ -130,6 +130,10 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
     onPixelsChange?.(pixels);
   }, [pixels, onPixelsChange]);
 
+  useEffect(() => {
+    setColoredCount(pixels.filter(Boolean).length);
+  }, [pixels]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -152,7 +156,6 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
       const idx = y * BOARD_SIZE + x;
       next[idx] = tool === "brush" ? brushColor : "";
       setActivePixel(next[idx] || "blank");
-      setColoredCount(next.filter(Boolean).length);
       return next;
     });
   };
@@ -280,3 +283,5 @@ export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function
     </div>
   );
 }
+
+);

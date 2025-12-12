@@ -74,6 +74,28 @@ async def test_pipeline_process_upload_without_background_removal(tmp_path, monk
 
 
 @pytest.mark.asyncio
+async def test_pipeline_crops_without_background_removal(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
+    pipeline = ImagePipeline(background_removal_enabled=False)
+
+    monkeypatch.setattr(
+        pipeline,
+        "_remove_background",
+        lambda image: (_ for _ in ()).throw(AssertionError("rembg should be skipped")),
+    )
+
+    image = create_alpha_image(64, 64, (30, 30, 34, 34))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    record = await pipeline.process_upload(buffer.getvalue(), "plain.png")
+
+    left, top, right, bottom = record.crop_box
+    assert right - left <= 8
+    assert bottom - top <= 8
+
+
+@pytest.mark.asyncio
 async def test_pipeline_rejects_non_image(monkeypatch, tmp_path):
     monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
     pipeline = ImagePipeline(background_removal_enabled=False)
@@ -97,6 +119,31 @@ async def test_pipeline_rejects_oversized_upload(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_pipeline_rejects_invalid_extension(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
+    pipeline = ImagePipeline(background_removal_enabled=False)
+
+    image = Image.new("RGBA", (4, 4), (255, 0, 0, 255))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    with pytest.raises(ValueError, match="Unsupported file extension"):
+        await pipeline.process_upload(buffer.getvalue(), "sample.bmp")
+
+
+@pytest.mark.asyncio
+async def test_pipeline_rejects_mismatched_format(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
+    pipeline = ImagePipeline(background_removal_enabled=False)
+
+    png_buffer = io.BytesIO()
+    Image.new("RGBA", (4, 4), (0, 255, 0, 255)).save(png_buffer, format="PNG")
+
+    with pytest.raises(ValueError, match="does not match detected image format"):
+        await pipeline.process_upload(png_buffer.getvalue(), "photo.jpg")
+
+
+@pytest.mark.asyncio
 async def test_expired_materials_are_evicted(monkeypatch, tmp_path):
     monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
     monkeypatch.setattr("app.services.image_processing.settings.material_ttl_seconds", 1)
@@ -116,4 +163,29 @@ async def test_expired_materials_are_evicted(monkeypatch, tmp_path):
     with pytest.raises(MaterialNotFoundError):
         await pipeline.get_material(record.material_id)
 
+    assert not (tmp_path / record.material_id).exists()
+
+
+@pytest.mark.asyncio
+async def test_expired_materials_purge_preview_cache(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.image_processing.settings.temp_dir", tmp_path)
+    monkeypatch.setattr("app.services.image_processing.settings.material_ttl_seconds", 1)
+    clock = {"now": 1000.0}
+    monkeypatch.setattr("app.services.image_processing.time.time", lambda: clock["now"])
+
+    pipeline = ImagePipeline(background_removal_enabled=False)
+
+    image = create_alpha_image(16, 16, (2, 2, 5, 5))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    record = await pipeline.process_upload(buffer.getvalue(), "kept.png")
+    await pipeline.get_preview_bytes(record.material_id, ResampleAlgorithm.LANCZOS, 8)
+    assert pipeline.preview_cache
+
+    clock["now"] = 1003.0
+    pipeline._evict_expired()
+
+    assert pipeline.preview_cache == {}
+    assert record.material_id not in pipeline.materials
     assert not (tmp_path / record.material_id).exists()
