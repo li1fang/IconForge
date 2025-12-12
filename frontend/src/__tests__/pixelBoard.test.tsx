@@ -1,11 +1,36 @@
 import { render, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PixelBoard } from "@/components/PixelBoard";
+import { PixelBoard, pixelsToPngBlob } from "@/components/PixelBoard";
 
 describe("PixelBoard interactions", () => {
+  const originalToBlob = HTMLCanvasElement.prototype.toBlob;
+  const originalGetContext = HTMLCanvasElement.prototype.getContext;
+
+  beforeEach(() => {
+    HTMLCanvasElement.prototype.toBlob = vi.fn((callback: BlobCallback) => {
+      callback(new Blob(["png"], { type: "image/png" }));
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillRect: vi.fn(),
+      clearRect: vi.fn(),
+      fillStyle: "",
+    } as unknown as CanvasRenderingContext2D);
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
+    HTMLCanvasElement.prototype.toBlob = originalToBlob;
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+  });
+
+  it("exports pixels to png blob", async () => {
+    const pixels = Array(16 * 16).fill("");
+    pixels[0] = "#ffffff";
+    const blob = await pixelsToPngBlob(pixels);
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe("image/png");
   });
 
   it("paints pixels with drag", async () => {

@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Eraser, Paintbrush2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -52,7 +59,46 @@ interface PixelBoardProps {
   onPixelsChange?: (pixels: string[]) => void;
 }
 
-export function PixelBoard({ onPixelsChange }: PixelBoardProps) {
+export interface PixelBoardHandle {
+  exportPngBlob: () => Promise<Blob>;
+  getPixels: () => string[];
+}
+
+export async function pixelsToPngBlob(
+  pixels: string[],
+  size: number = BOARD_SIZE
+): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("无法创建画布上下文，导出 PNG 失败");
+  }
+
+  pixels.forEach((color, index) => {
+    if (!color) return;
+    const x = index % size;
+    const y = Math.floor(index / size);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, 1, 1);
+  });
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("无法生成 PNG Blob"));
+        return;
+      }
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
+export const PixelBoard = forwardRef<PixelBoardHandle, PixelBoardProps>(function PixelBoard(
+  { onPixelsChange }: PixelBoardProps,
+  ref
+) {
   const [pixels, setPixels] = useState<string[]>(
     () => Array(BOARD_SIZE * BOARD_SIZE).fill("")
   );
@@ -83,6 +129,15 @@ export function PixelBoard({ onPixelsChange }: PixelBoardProps) {
     renderAll(pixels);
     onPixelsChange?.(pixels);
   }, [pixels, onPixelsChange]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      exportPngBlob: () => pixelsToPngBlob(pixels),
+      getPixels: () => [...pixels],
+    }),
+    [pixels]
+  );
 
   const updatePixel = (clientX: number, clientY: number, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
